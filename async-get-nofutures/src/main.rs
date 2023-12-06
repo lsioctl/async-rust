@@ -21,10 +21,9 @@ fn main() -> std::io::Result<()> {
     let buffer_reader = BufReader::new(&mut stream);
 
     buffer_reader
-    .lines()
-    .map(|line| line.unwrap())
-    .for_each(|line| { println!("{}", line)});
-
+        .lines()
+        .map(|line| line.unwrap())
+        .for_each(|line| { println!("{}", line)});
 
     Ok(())
 }
