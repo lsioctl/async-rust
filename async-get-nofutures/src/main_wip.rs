@@ -1,15 +1,26 @@
+// Macro from mio
+#[allow(unused_macros)]
+macro_rules! syscall {
+    ($fn: ident ( $($arg: expr),* $(,)* ) ) => {{
+        let res = unsafe { libc::$fn($($arg, )*) };
+        if res == -1 {
+            Err(std::io::Error::last_os_error())
+        } else {
+            Ok(res)
+        }
+    }};
+}
+
 //use std::io::BufReader;
 // use mio instead of std::net to have non blocking
-use mio::net::TcpStream;
+use mio::net::{TcpStream, SocketAddr};
 use mio::{Events, Poll, Token, Interest};
-use std::io::{Write, BufReader, BufRead};
+use std::io::{Read, Write, BufReader, BufRead};
 use std::time::Duration;
 
 fn main() -> std::io::Result<()> {
-    // Note: const needed for matching
-    // if it is a variable matching doesn't work
-    const CLIENT_WRITE: Token = Token(0);
-    const CLIENT_READ: Token = Token(1);
+    const client_write: Token = Token(0);
+    const client_read: Token = Token(1);
     // TODO: here compiler goes better without the type
     // SocketAddr as it messes it up with:
     // mio::sys::unix::uds::socketaddr
@@ -23,7 +34,7 @@ fn main() -> std::io::Result<()> {
     // not: if we attempt to read or write, it could retourn would_block error
     let mut stream = TcpStream::connect(server_address)?;
 
-    let mut event_list = Events::with_capacity(2);
+    // let mut event_list = Events::with_capacity(2);
     // TODO here new() return io::Result<Poll>,
     // but ? operator implicit conversion works
     // => there should be an implementation of the trait
@@ -31,13 +42,13 @@ fn main() -> std::io::Result<()> {
     // like <std::io::Error as From<NulError>>
     // => choose an error propagation and handling (unwrap, ?, ...)
     // for more consistency
-    let mut mio_poll = Poll::new()?;
-    let _ = mio_poll.registry().register(&mut stream, CLIENT_WRITE, Interest::WRITABLE);
+    // let mut mio_poll = Poll::new()?;
+    // let _ = mio_poll.registry().register(&mut stream, client_write, Interest::WRITABLE);
 
     // event loop
     loop {
         // poll (blocking): waiting for 10 milliseconds
-        mio_poll.poll(&mut event_list, Some(Duration::from_secs(10)))?;
+        //mio_poll.poll(&mut event_list, Some(Duration::from_millis(10000)))?;
         println!("Polling");
 
         event_list.iter().for_each(|event| {
@@ -45,16 +56,37 @@ fn main() -> std::io::Result<()> {
             match event.token() {
                 // TODO: this look as a state machine, as I
                 // have to deregister to avoid subsequent events
-                CLIENT_WRITE => {
+                //  I think I am doing something wrong
+                // TODO also: We can have an event here when
+                // connection is refused:
+                ///
+                /// token: Token(
+                //     0,
+                // ),
+                // readable: false,
+                // writable: true,
+                // error: true,
+                // read_closed: true,
+                // write_closed: true,
+                // priority: false,
+                // aio: false,
+                // lio: false,
+                // details: epoll_event {
+                //     events: EPOLLOUT|EPOLLERR|EPOLLHUP,
+                //     u64: 0,
+                // },
+                client_write => {
+                    //let _ = mio_poll.registry().deregister(&mut stream);
+                    // // Note: it seems that the Write trait
+                    // // is included with std::io::prelude::*
                     if event.is_error() == false {
                         // TODO: can't use ? operator here
                         stream.write(b"GET / HTTP/1.0\n\n").unwrap();
                         println!("Written");
+                        //let _ = mio_poll.registry().register(&mut stream, client_read, Interest::READABLE);
                     }
-                    let _ = mio_poll.registry().deregister(&mut stream);
-                    let _ = mio_poll.registry().register(&mut stream, CLIENT_READ, Interest::READABLE);
                 },
-                CLIENT_READ => {
+                client_read => {
                     // I will use BufReader instead
                     // let mut received = [0; 128];
                     // stream.read(&mut received)?;
@@ -70,15 +102,11 @@ fn main() -> std::io::Result<()> {
                             .map(|line| line.unwrap())
                             .for_each(|line| { println!("{}", line)});
                     }
-
-                    let _ = mio_poll.registry().deregister(&mut stream);
                 }
                 _ => unimplemented!()
             }
         });
     }
     
-    // For now unreachable because of the event loop
-    #[allow(unreachable_code)]
     Ok(())
 }
