@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 futures = "0.3.29"
+mio = { version = "0.8.10", features = ["net", "os-poll"] }
