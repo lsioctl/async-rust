@@ -3,6 +3,9 @@ use mio::net::TcpStream;
 use std::os::unix::io::AsRawFd;
 use minitokio::ioeventloop::{IoEventLoop, Interest};
 
+use std::thread;
+use std::time::Duration;
+
 #[test]
 fn epoll_write() {
     // TODO: still issues with casting so I can't use const
@@ -16,4 +19,6 @@ fn epoll_write() {
     io.register_interest(client_stream.as_raw_fd(), Interest::Writeable);
 
     io.run();
+
+    thread::sleep(Duration::from_secs(10));
 }

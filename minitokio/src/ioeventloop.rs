@@ -15,6 +15,7 @@ macro_rules! syscall {
 // use std::time::Duration;
 // use std::thread;
 // use std::sync::mpsc;
+use std::thread;
 
 // use crate::task::Task;
 
@@ -70,33 +71,39 @@ impl IoEventLoop {
     }
 
     pub fn run(&self) {
-        let mut event_list: Vec<libc::epoll_event> = Vec::with_capacity(1024);
+        let epoll_fd = self.epoll_fd;
 
-        event_list.clear();
+        thread::spawn(move || {
+            println!("Thread running");
+            let mut event_list: Vec<libc::epoll_event> = Vec::with_capacity(1024);
 
-        let res = syscall!(epoll_wait(
-            self.epoll_fd,
-            event_list.as_mut_ptr() as *mut libc::epoll_event,
-            1024,
-            10000
-        )).unwrap();
+            event_list.clear();
 
-        println!("res: {}", res);
+            let res = syscall!(epoll_wait(
+                epoll_fd,
+                event_list.as_mut_ptr() as *mut libc::epoll_event,
+                1024,
+                10000
+            )).unwrap();
 
-        // if we do not set the length, it stays 0 as we modified the data
-        // pointer only
-        // safe  as long as the kernel does nothing wrong - copied from mio
-        unsafe { event_list.set_len(res as usize) };
+            println!("res: {}", res);
 
-        // reference to packed field is unaligned
-        // !("{}", event_list.get(0).unwrap().u64);
+            // if we do not set the length, it stays 0 as we modified the data
+            // pointer only
+            // safe  as long as the kernel does nothing wrong - copied from mio
+            unsafe { event_list.set_len(res as usize) };
 
-        for ev in event_list {
-            // copy to a local variable to avoid println macro
             // reference to packed field is unaligned
-            let what = ev.u64;
-            println!("{}", what);
-        }
+            // !("{}", event_list.get(0).unwrap().u64);
+
+            for ev in event_list {
+                // copy to a local variable to avoid println macro
+                // reference to packed field is unaligned
+                let what = ev.u64;
+                let wtype = ev.events;
+                println!("{}: {}", what, wtype);
+            }
+        });
 
     }
 }
