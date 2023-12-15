@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 use mio::Interest;
 use mio::net::TcpStream;
-use minitokio::ioeventloop::{IoEventLoop};
+use minitokio::ioeventloop::IoEventLoop;
 
 use std::thread;
 use std::time::Duration;
@@ -16,9 +16,9 @@ fn epoll_write() {
 
     let mut client_stream = TcpStream::connect(server_addr).unwrap();
 
+    thread::sleep(Duration::from_secs(2));
+
     io.register(&mut client_stream, Interest::WRITABLE);
 
-    io.run();
-
-    thread::sleep(Duration::from_secs(10));
+    thread::sleep(Duration::from_secs(2));
 }

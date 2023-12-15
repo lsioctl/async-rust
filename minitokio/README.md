@@ -64,7 +64,23 @@ and clearly sharing the poll fd was working, but didn't fell to Rusty
 
 And then I remembered the pattern in the rust book to share type that are not Send and Sync:
 
-Arc<Muts<T>>
+Arc<Mutex<T>>
 
 So I am going back to use mio and try this way
 
+## It works better without Mutex
+
+Noob mistake, a mutex at the start of a inite loop ... is a recipe for race conditions
+Even with a small scope, it needs long operation to release the mutex.
+
+Found an interesting solution for my needs in tokio source code with try_clone:
+
+```rust
+        // try_clone allows to creates a new independently owned Registry.
+        // Event sources registered with this Registry will be registered 
+        // with the original Registry and Poll instance.
+        let registry = poll.registry().try_clone().unwrap();
+```
+
+So no need for a mutex and I can have write access to the registry outside the
+inifinite loop on poll.

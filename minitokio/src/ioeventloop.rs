@@ -1,43 +1,51 @@
-use mio::{Events, Poll, Token, Interest};
+use mio::{Events, Poll, Token, Interest, Registry};
+use mio::event::Source;
 use std::time::Duration;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use mio::net::TcpStream;
 
 pub struct IoEventLoop {
-    mio_poll_wrapped: Arc<Mutex<Poll>> 
+    registry: Registry
 }
 
 impl IoEventLoop {
     pub fn new() -> Self {
-        let mio_poll = Poll::new().unwrap();
+        let poll = Poll::new().unwrap();
+        // try_clone allows to creates a new independently owned Registry.
+        // Event sources registered with this Registry will be registered 
+        // with the original Registry and Poll instance.
+        let registry = poll.registry().try_clone().unwrap();
 
-        IoEventLoop {
-            mio_poll_wrapped: Arc::new(Mutex::new(mio_poll))
-        }
+        let io = IoEventLoop {
+            registry
+        };
+
+        // TODO: feels clumsy
+        io.run(poll);
+
+        io
     }
 
-    pub fn run(&self) {
-        let mio_poll_wrapped = self.mio_poll_wrapped.clone();
-
+    fn run(&self, mut poll: Poll) {
         thread::spawn(move || {
-            let mut mio_poll_guard = mio_poll_wrapped.lock().unwrap();
+            loop {
+                println!("In Da Loop");
 
-            let mut event_list = Events::with_capacity(2);
+                let mut event_list = Events::with_capacity(2);
 
-            mio_poll_guard.poll(&mut event_list, Some(Duration::from_secs(10))).unwrap();
+                poll.poll(&mut event_list, Some(Duration::from_secs(10))).unwrap();
 
-            event_list.iter().for_each(|event| {
-                println!("{:#?}", event);
-            })  
+                event_list.iter().for_each(|event| {
+                    println!("{:#?}", event);
+                })
+            }
         });
     }
 
-    pub fn register(&self, stream: &mut TcpStream, interest: Interest) {
-        let mio_poll_guard = self.mio_poll_wrapped.lock().unwrap();
-
+    pub fn register(&self, stream: &mut impl Source, interest: Interest) {
         // I'll use a real token later to keep an internal hasmap of wakers and events
-        let _ = mio_poll_guard.registry().register(stream, Token(3000), interest);
+        let _ = self.registry.register(stream, Token(3000), interest);
     }
 }
 
