@@ -2,6 +2,11 @@ use std::future::Future;
 use std::sync::{mpsc, Arc, Mutex};
 
 use crate::task::Task;
+use crate::ioeventloop::IoEventLoop;
+
+use std::sync::OnceLock;
+
+pub static IO_EVENT_LOOP: OnceLock<Mutex<IoEventLoop>> = OnceLock::new();
 
 pub struct MiniTokio {
     initial_sender: Option<mpsc::Sender<Arc<Task>>>,
@@ -10,6 +15,12 @@ pub struct MiniTokio {
 
 impl MiniTokio {
     pub fn new() -> Self {
+        // I use OnceLock to be sure initialization occurs only once, even if different
+        // threads call it at the same time (not sure lazy_static could do that)
+        let _ = IO_EVENT_LOOP.get_or_init(|| {
+            Mutex::new(IoEventLoop::new())
+        });
+
         let (sender, scheduled) = mpsc::channel();
         MiniTokio { initial_sender: Some(sender), scheduled }
     }

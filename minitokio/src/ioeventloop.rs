@@ -1,14 +1,14 @@
-use mio::{Events, Poll, Token, Interest, Registry};
-use mio::event::Source;
 use std::collections::HashMap;
 use std::time::Duration;
-use std::sync::{Arc, Mutex};
 use std::thread;
 use core::task::Waker;
 
+use mio::{Events, Poll, Token, Interest, Registry};
+use mio::event::Source;
+
 pub struct IoEventLoop {
     registry: Registry,
-    waker_map: HashMap<Token, Waker>
+    waker_map: HashMap<Token, Waker>,
 }
 
 impl IoEventLoop {
