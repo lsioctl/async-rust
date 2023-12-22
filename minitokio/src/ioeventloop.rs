@@ -1,12 +1,14 @@
 use mio::{Events, Poll, Token, Interest, Registry};
 use mio::event::Source;
+use std::collections::HashMap;
 use std::time::Duration;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use mio::net::TcpStream;
+use core::task::Waker;
 
 pub struct IoEventLoop {
-    registry: Registry
+    registry: Registry,
+    waker_map: HashMap<Token, Waker>
 }
 
 impl IoEventLoop {
@@ -18,7 +20,8 @@ impl IoEventLoop {
         let registry = poll.registry().try_clone().unwrap();
 
         let io = IoEventLoop {
-            registry
+            registry,
+            waker_map: HashMap::new()
         };
 
         // TODO: feels clumsy
@@ -46,6 +49,14 @@ impl IoEventLoop {
     pub fn register(&self, stream: &mut impl Source, interest: Interest) {
         // I'll use a real token later to keep an internal hasmap of wakers and events
         let _ = self.registry.register(stream, Token(3000), interest);
+    }
+
+    pub fn register_with_waker(&mut self, stream: &mut impl Source, interest: Interest, waker: &Waker) {
+        // TODO: random Token
+        let token = Token(3000);
+
+        self.waker_map.insert(token, waker.clone());
+        let _ = self.registry.register(stream, token, interest);
     }
 }
 
